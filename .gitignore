@@ -1,0 +1,5 @@
+*.cm*
+*.annot
+*.[oa]
+insideout.ml
+insideout
