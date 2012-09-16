@@ -1,5 +1,6 @@
 {
-type token = Var of string | Text of string
+  let version = "0.9.0"
+  type token = Var of string | Text of string
 }
 
 let blank = [' ' '\t']
@@ -65,6 +66,10 @@ let %s %s =
             out_file := Some s
       ),
       "<file>  Output file (default: output goes to stdout)";
+
+      "-version",
+      Arg.Unit (fun () -> print_endline version; exit 0),
+      " Print version and exit.";
     ]
     in
     let anon_fun s =
