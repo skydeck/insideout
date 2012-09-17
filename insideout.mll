@@ -32,7 +32,7 @@ rule tokens = parse
     in
     fprintf oc "\
 (* Auto-generated from %s. Do not edit. *)
-let %s %s =
+let %s%s =
 
   String.concat \"\" [\n"
       source
