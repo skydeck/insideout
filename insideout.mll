@@ -1,20 +1,56 @@
 {
-type token = Var of string | Text of string
+type var = {
+  ident : string;
+  format : string option; (* "%d" *)
+  default : string option;
+}
+
+type token =
+  Var of var
+| Text of string
 }
 
 let blank = [' ' '\t']
+let space = [' ' '\t' '\r' '\n']
 let ident = ['a'-'z']['a'-'z' '_' 'A'-'Z' '0'-'9']*
+let graph = ['\033'-'\126']
+let format_char = graph # ['\\' ':' '}']
 
 rule tokens = parse
-  | "${" blank* (ident as id) blank* "}"   { Var id :: tokens lexbuf }
+  | "${" space* (ident as ident) space*
+                                   { let format = opt_format lexbuf in
+                                     let default = opt_default lexbuf in
+                                     Var { ident; format; default }
+                                     :: tokens lexbuf
+                                   }
   | "\\$"                          { Text "$" :: tokens lexbuf }
   | "\\\\"                         { Text "\\" :: tokens lexbuf }
   | [^'$''\\']+ as s               { Text s :: tokens lexbuf }
   | _ as c                         { Text (String.make 1 c) :: tokens lexbuf }
   | eof                            { [] }
 
+and opt_format = parse
+  | "%" format_char+ as format space*    { Some format }
+  | ""                                   { None }
+
+and opt_default = parse
+  | ":"    { Some (string [] lexbuf) }
+  | "}"    { None }
+
+and string acc = parse
+  | "}"                { String.concat "" (List.rev acc) }
+  | "\\\\"             { string ("\\" :: acc) lexbuf }
+  | "\\}"              { string ("}" :: acc) lexbuf }
+  | "\\\n" blank*      { string acc lexbuf }
+  | [^'}' '\\']+ as s  { string (s :: acc) lexbuf }
+  | _ as c             { string (String.make 1 c :: acc) lexbuf }
+
 {
   open Printf
+
+  let error source msg =
+    eprintf "Error in file %s: %s\n%!" source msg;
+    exit 1
 
   let run function_name source ic oc =
     let lexbuf = Lexing.from_channel ic in
@@ -23,25 +59,59 @@ rule tokens = parse
       let tbl = Hashtbl.create 10 in
       List.iter (
         function
-          | Var id ->
-              Hashtbl.replace tbl id ()
+          | Var x ->
+              let id = x.ident in
+              (try
+                 let x0 = Hashtbl.find tbl id in
+                 if x <> x0 then
+                   error source (
+                     sprintf
+                       "Variable %s occurs multiple times with a \n\
+                        different %%format or different default value."
+                       id
+                   )
+                 else
+                   Hashtbl.replace tbl id x
+             with Not_found ->
+                 Hashtbl.add tbl id x
+            )
           | Text _ ->
               ()
       ) l;
-      List.sort String.compare (Hashtbl.fold (fun k () acc -> k :: acc) tbl [])
+      List.sort
+        (fun a b -> String.compare a.ident b.ident)
+        (Hashtbl.fold (fun k v acc -> v :: acc) tbl [])
+    in
+    let args =
+      let l =
+        List.map (
+          function
+            | { ident; default = Some default } ->
+                sprintf "\n  ?(%s = %S)" ident default
+            | { ident; default = None } ->
+                "\n  ~" ^ ident
+        ) vars
+      in
+      String.concat "" l
     in
     fprintf oc "\
 (* Auto-generated from %s. Do not edit. *)
-let %s%s =
+let %s%s () =
 
   String.concat \"\" [\n"
       source
       function_name
-      (String.concat "" (List.map (fun s -> "\n  ~" ^ s) vars));
+      args;
     List.iter (
       function
-        | Var id ->
-            fprintf oc "    %s;\n" id
+        | Var x ->
+            let id = x.ident in
+            (match x.format with
+               | None ->
+                   fprintf oc "    %s;\n" id
+               | Some fmt ->
+                   fprintf oc "    Printf.sprintf %S %s;\n" fmt id
+            )
         | Text s ->
             fprintf oc "    %S;\n" s
     ) l;
@@ -83,7 +153,7 @@ Convert a template into an OCaml function with labelled arguments.
 
 becomes:
 
-  let gen ~x = \"Hello \" ^ x
+  let gen ~x () = \"Hello \" ^ x
 
 Use a backslash character to escape $ or \\ itself (\\\\\\${x} gives \\${x}).
 

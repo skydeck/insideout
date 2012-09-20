@@ -31,3 +31,11 @@ Installation
 $ make
 $ make install
 ```
+
+Example
+-------
+
+See file `example.html` and run demo with:
+```
+$ make demo
+```
