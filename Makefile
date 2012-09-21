@@ -4,6 +4,7 @@ insideout: insideout.mll
 
 .PHONY: demo
 demo: example
+	./insideout example.html -preview -o preview.html
 	./example > out.html
 
 example: example.ml example_main.ml
@@ -27,4 +28,4 @@ install:
 .PHONY: clean
 clean:
 	rm -f *.o *.cm* *~ insideout.ml insideout
-	rm -f example.ml out.html example
+	rm -f example.ml example preview.html out.html
