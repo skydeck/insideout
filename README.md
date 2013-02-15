@@ -62,5 +62,5 @@ TODO
 ----
 
 * add support for search path for included files
-* support inclusion of templates (as opposed to verbatime inclusion
+* support inclusion of templates (as opposed to verbatim inclusion
   already supported)
