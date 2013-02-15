@@ -57,3 +57,10 @@ See file `example.html` and run demo with:
 ```
 $ make demo
 ```
+
+TODO
+----
+
+* add support for search path for included files
+* support inclusion of templates (as opposed to verbatime inclusion
+  already supported)
