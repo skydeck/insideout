@@ -1,5 +1,7 @@
 {
 
+open Printf
+
 type var = {
   ident : string;
   format : string option; (* "%d" *)
@@ -10,6 +12,33 @@ type token =
   Var of var
 | Text of string
 
+let pos1 lexbuf = lexbuf.Lexing.lex_start_p
+let pos2 lexbuf = lexbuf.Lexing.lex_curr_p
+let loc lexbuf = (pos1 lexbuf, pos2 lexbuf)
+
+let string_of_loc (pos1, pos2) =
+  let open Lexing in
+  let line1 = pos1.pos_lnum
+  and start1 = pos1.pos_bol in
+  sprintf "File %S, line %i, characters %i-%i"
+    pos1.pos_fname line1
+    (pos1.pos_cnum - start1)
+    (pos2.pos_cnum - start1)
+
+let error lexbuf msg =
+  eprintf "%s:\n%s\n%!" (string_of_loc (loc lexbuf)) msg;
+  failwith "Aborted"
+
+let read_file lexbuf fname =
+  try
+    let ic = open_in fname in
+    let len = in_channel_length ic in
+    let s = String.create len in
+    really_input ic s 0 len;
+    s
+  with e ->
+    error lexbuf
+      (sprintf "Cannot include file %s: %s" fname (Printexc.to_string e))
 }
 
 let blank = [' ' '\t']
@@ -17,6 +46,7 @@ let space = [' ' '\t' '\r' '\n']
 let ident = ['a'-'z']['a'-'z' '_' 'A'-'Z' '0'-'9']*
 let graph = ['\033'-'\126']
 let format_char = graph # ['\\' ':' '}']
+let filename = [^'}']+
 
 rule tokens = parse
   | "${" space* (ident as ident) space*
@@ -25,6 +55,11 @@ rule tokens = parse
                                      Var { ident; format; default }
                                      :: tokens lexbuf
                                    }
+  | "${@" (filename as filename) "}"
+                                   (* as-is inclusion, no substitutions,
+                                      no escaping *)
+                                   { let s = read_file lexbuf filename in
+                                     Text s :: tokens lexbuf }
   | "\\$"                          { Text "$" :: tokens lexbuf }
   | "\\\\"                         { Text "\\" :: tokens lexbuf }
   | [^'$''\\']+ as s               { Text s :: tokens lexbuf }

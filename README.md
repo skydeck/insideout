@@ -20,7 +20,25 @@ let gen ~name = "Hello " ^ name
 ```
 Use a backslash character to escape $ or \ itself (\\\${x} gives \${x}).
 
-Use `insideout -help` to see the available options.
+Printf formatting:
+```
+${x %f}
+```
+(formats the argument `x` using `Printf.sprintf "%f" x`)
+
+File inclusion (as-is, no escaping, no substitutions):
+```
+${@foo/bar}
+```
+(includes the contents of file `foo/bar`)
+
+Default values (useful for previews or suggested usage):
+```
+${title:Here goes the title}
+```
+
+Use `insideout -help` to see the command-line options.
+
 
 Installation
 ------------
